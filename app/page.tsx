@@ -8,8 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { useToast } from "@/hooks/use-toast"
-import { Search, UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users, X } from 'lucide-react'
+import { UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users } from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -36,7 +35,6 @@ type Convidado = {
 }
 
 export default function PaginaCheckIn() {
-  const { toast } = useToast()
   const [convidadosPendentes, setConvidadosPendentes] = useState<Convidado[]>([])
   const [convidadosRegistrados, setConvidadosRegistrados] = useState<Convidado[]>([])
   const [todosConvidados, setTodosConvidados] = useState<Convidado[]>([])
@@ -59,6 +57,8 @@ export default function PaginaCheckIn() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const itensPorPagina = 10
+
+  console.log(capturedImage)
 
   useEffect(() => {
     checkSession()
