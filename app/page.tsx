@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users, Search, UserCircle2, Users2, Crown, Home, Briefcase, Heart } from 'lucide-react'
+import { UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users, UserCircle2, Users2, Crown, Home, Briefcase, Heart } from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -66,6 +66,8 @@ export default function PaginaCheckIn() {
   })
   const [allConvidadosPendentes, setAllConvidadosPendentes] = useState<Convidado[]>([])
   const [allConvidadosRegistrados, setAllConvidadosRegistrados] = useState<Convidado[]>([])
+
+  console.log(capturedImage)
 
   useEffect(() => {
     checkSession()
@@ -297,7 +299,6 @@ export default function PaginaCheckIn() {
   }
 
   const renderGuestTypeCounts = (listType: 'pendentes' | 'registrados') => {
-    const guests = listType === 'pendentes' ? allConvidadosPendentes : allConvidadosRegistrados;
     return (
       <div className="grid grid-cols-2 gap-2 mt-4">
         {Object.entries(guestTypeCounts[listType]).map(([tipo, count]) => (
