@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users } from 'lucide-react'
+import { UserPlus, QrCode, Trash2, Edit, CheckCircle, User, Users, Search, UserCircle2, Users2, Crown, Home, Briefcase, Heart } from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -58,14 +58,20 @@ export default function PaginaCheckIn() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const itensPorPagina = 10
-
-  console.log(capturedImage)
+  const [filteredGuests, setFilteredGuests] = useState<Convidado[]>([])
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const [guestTypeCounts, setGuestTypeCounts] = useState({
+    pendentes: {} as Record<string, number>,
+    registrados: {} as Record<string, number>
+  })
+  const [allConvidadosPendentes, setAllConvidadosPendentes] = useState<Convidado[]>([])
+  const [allConvidadosRegistrados, setAllConvidadosRegistrados] = useState<Convidado[]>([])
 
   useEffect(() => {
     checkSession()
     buscarConvidados()
     buscarTodosConvidados()
-  }, [paginaAtualPendentes, paginaAtualRegistrados, termoPesquisa])
+  }, [paginaAtualPendentes, paginaAtualRegistrados, termoPesquisa, activeFilter])
 
   async function checkSession() {
     const { data, error } = await supabase.auth.getSession()
@@ -98,30 +104,37 @@ export default function PaginaCheckIn() {
       queryRegistrados = queryRegistrados.or(searchFilter)
     }
 
-    const { data: pendentesData, error: pendentesError, count: pendentesCount } = await queryPendentes
-      .order('Nome', { ascending: true })
-      .range(indiceInicialPendentes, indiceInicialPendentes + itensPorPagina - 1)
+    if (activeFilter) {
+      queryPendentes = queryPendentes.eq('TipoConvidado', activeFilter)
+      queryRegistrados = queryRegistrados.eq('TipoConvidado', activeFilter)
+    }
 
-    const { data: registradosData, error: registradosError, count: registradosCount } = await queryRegistrados
+    const { data: allPendentesData, error: pendentesError, count: pendentesCount } = await queryPendentes
       .order('Nome', { ascending: true })
-      .range(indiceInicialRegistrados, indiceInicialRegistrados + itensPorPagina - 1)
+
+    const { data: allRegistradosData, error: registradosError, count: registradosCount } = await queryRegistrados
+      .order('Nome', { ascending: true })
 
     if (pendentesError) {
       console.error('Erro ao buscar convidados pendentes:', pendentesError)
       setAlertMessage("Erro ao buscar convidados pendentes. Por favor, tente novamente mais tarde.")
     } else {
-      setConvidadosPendentes(pendentesData || [])
+      setAllConvidadosPendentes(allPendentesData || [])
+      setConvidadosPendentes(allPendentesData?.slice(indiceInicialPendentes, indiceInicialPendentes + itensPorPagina) || [])
       setTotalPaginasPendentes(Math.ceil((pendentesCount || 0) / itensPorPagina))
       setTotalConvidadosPendentes(pendentesCount || 0)
+      updateGuestTypeCounts(allPendentesData || [], 'pendentes')
     }
 
     if (registradosError) {
       console.error('Erro ao buscar convidados registrados:', registradosError)
       setAlertMessage("Erro ao buscar convidados registrados. Por favor, tente novamente mais tarde.")
     } else {
-      setConvidadosRegistrados(registradosData || [])
+      setAllConvidadosRegistrados(allRegistradosData || [])
+      setConvidadosRegistrados(allRegistradosData?.slice(indiceInicialRegistrados, indiceInicialRegistrados + itensPorPagina) || [])
       setTotalPaginasRegistrados(Math.ceil((registradosCount || 0) / itensPorPagina))
       setTotalConvidadosRegistrados(registradosCount || 0)
+      updateGuestTypeCounts(allRegistradosData || [], 'registrados')
     }
   }
 
@@ -251,6 +264,14 @@ export default function PaginaCheckIn() {
     }
   }
 
+  const updateGuestTypeCounts = (guests: Convidado[], listType: 'pendentes' | 'registrados') => {
+    const counts = guests.reduce((acc, guest) => {
+      acc[guest.TipoConvidado] = (acc[guest.TipoConvidado] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    setGuestTypeCounts(prev => ({ ...prev, [listType]: counts }))
+  }
+
   const getGuestTypeColor = (tipo: string) => {
     switch (tipo) {
       case 'Amigo': return 'bg-blue-500'
@@ -263,108 +284,168 @@ export default function PaginaCheckIn() {
     }
   }
 
+  const getGuestTypeIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'Amigo': return <UserCircle2 className="h-4 w-4" />
+      case 'Convidado Pais': return <Users2 className="h-4 w-4" />
+      case 'Padrinhos': return <Crown className="h-4 w-4" />
+      case 'Família': return <Home className="h-4 w-4" />
+      case 'Trabalho': return <Briefcase className="h-4 w-4" />
+      case 'Cônjuge Amigo': return <Heart className="h-4 w-4" />
+      default: return <User className="h-4 w-4" />
+    }
+  }
+
+  const renderGuestTypeCounts = (listType: 'pendentes' | 'registrados') => {
+    const guests = listType === 'pendentes' ? allConvidadosPendentes : allConvidadosRegistrados;
+    return (
+      <div className="grid grid-cols-2 gap-2 mt-4">
+        {Object.entries(guestTypeCounts[listType]).map(([tipo, count]) => (
+          <div key={tipo} className="flex items-center space-x-2">
+            <span className={`inline-block w-3 h-3 rounded-full ${getGuestTypeColor(tipo)}`}></span>
+            {getGuestTypeIcon(tipo)}
+            <span className="text-sm font-medium">{tipo}: {count}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   const renderizarLegenda = () => (
     <div className="flex flex-wrap justify-center gap-4 mb-4">
       {['Amigo', 'Convidado Pais', 'Padrinhos', 'Família', 'Trabalho', 'Cônjuge Amigo'].map((tipo) => (
-        <div key={tipo} className="flex items-center">
+        <Button
+          key={tipo}
+          variant="outline"
+          size="sm"
+          className={`flex items-center ${activeFilter === tipo ? 'bg-primary text-primary-foreground' : ''}`}
+          onClick={() => {
+            setActiveFilter(activeFilter === tipo ? null : tipo)
+            setPaginaAtualPendentes(1)
+            setPaginaAtualRegistrados(1)
+          }}
+        >
           <span className={`inline-block w-3 h-3 rounded-full mr-2 ${getGuestTypeColor(tipo)}`}></span>
           <span className="text-sm">{tipo}</span>
-        </div>
+        </Button>
       ))}
     </div>
   )
 
-  const renderizarTabela = (convidados: Convidado[], titulo: string, totalConvidados: number, paginaAtual: number, setPaginaAtual: (page: number) => void, totalPaginas: number) => (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{titulo} ({totalConvidados})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {renderizarLegenda()}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead className="hidden sm:table-cell">Email</TableHead>
-                <TableHead className="hidden sm:table-cell">Telefone</TableHead>
-                <TableHead className="hidden sm:table-cell">Tipo</TableHead>
-                {titulo === "Convidados Registrados" && <TableHead className="hidden sm:table-cell">Data/Hora Check-in</TableHead>}
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {convidados.length === 0 ? (
+  const renderizarTabela = (convidados: Convidado[], titulo: string, totalConvidados: number, paginaAtual: number, setPaginaAtual: (page: number) => void, totalPaginas: number) => {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>{titulo} ({totalConvidados})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {renderizarLegenda()}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={titulo === "Convidados Registrados" ? 6 : 5} className="text-center">
-                    Nenhum convidado encontrado
-                  </TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="hidden sm:table-cell">Telefone</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    <div className="flex items-center">
+                      Tipo
+                      {activeFilter && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setActiveFilter(null)
+                            setPaginaAtualPendentes(1)
+                            setPaginaAtualRegistrados(1)
+                          }}
+                          className="ml-2"
+                        >
+                          (Limpar filtro)
+                        </Button>
+                      )}
+                    </div>
+                  </TableHead>
+                  {titulo === "Convidados Registrados" && <TableHead className="hidden sm:table-cell">Data/Hora Check-in</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
-              ) : (
-                convidados.map((convidado) => (
-                  <TableRow key={convidado.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-block w-3 h-3 rounded-full ${getGuestTypeColor(convidado.TipoConvidado)}`}></span>
-                        <span>{convidado.Nome}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">{convidado.Email}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{convidado.Telefone}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{convidado.TipoConvidado}</TableCell>
-                    {titulo === "Convidados Registrados" && (
-                      <TableCell className="hidden sm:table-cell">{new Date(convidado.DataHoraCheckIn!).toLocaleString()}</TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => {
-                          setConvidadoSelecionado(convidado)
-                          setAtualizandoConvidado(true)
-                        }}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => {
-                          setConvidadoSelecionado(convidado)
-                          setExcluindoConvidado(true)
-                        }}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {convidados.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={titulo === "Convidados Registrados" ? 6 : 5} className="text-center">
+                      Nenhum convidado encontrado
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="mt-4 flex justify-center">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious onClick={() => setPaginaAtual(Math.max(paginaAtual - 1, 1))} />
-              </PaginationItem>
-              {Array.from({ length: totalPaginas }, (_, i) => (
-                <PaginationItem key={i} className="hidden sm:inline-block">
-                  <PaginationLink onClick={() => setPaginaAtual(i + 1)} isActive={paginaAtual === i + 1}>
-                    {i + 1}
-                  </PaginationLink>
+                ) : (
+                  convidados.map((convidado) => (
+                    <TableRow key={convidado.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-block w-3 h-3 rounded-full ${getGuestTypeColor(convidado.TipoConvidado)}`}></span>
+                          <span>{convidado.Nome}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">{convidado.Email}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{convidado.Telefone}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{convidado.TipoConvidado}</TableCell>
+                      {titulo === "Convidados Registrados" && (
+                        <TableCell className="hidden sm:table-cell">{new Date(convidado.DataHoraCheckIn!).toLocaleString()}</TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="icon" onClick={() => {
+                            setConvidadoSelecionado(convidado)
+                            setAtualizandoConvidado(true)
+                          }}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={() => {
+                            setConvidadoSelecionado(convidado)
+                            setExcluindoConvidado(true)
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-4 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious onClick={() => setPaginaAtual(Math.max(paginaAtual - 1, 1))} />
                 </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext onClick={() => setPaginaAtual(Math.min(paginaAtual + 1, totalPaginas))} />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </CardContent>
-    </Card>
-  )
+                {Array.from({ length: totalPaginas }, (_, i) => (
+                  <PaginationItem key={i} className="hidden sm:inline-block">
+                    <PaginationLink onClick={() => setPaginaAtual(i + 1)} isActive={paginaAtual === i + 1}>
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext onClick={() => setPaginaAtual(Math.min(paginaAtual + 1, totalPaginas))} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
-  const convidadosFiltrados = todosConvidados.filter(convidado =>
-    convidado.Nome.toLowerCase().includes(pesquisaCheckInManual.toLowerCase()) ||
-    convidado.Email.toLowerCase().includes(pesquisaCheckInManual.toLowerCase()) ||
-    convidado.Telefone.toLowerCase().includes(pesquisaCheckInManual.toLowerCase())
-  )
+  const searchGuests = () => {
+    const filtered = todosConvidados.filter(convidado =>
+      (convidado.Nome?.toLowerCase() || '').includes(pesquisaCheckInManual.toLowerCase()) ||
+      (convidado.Email?.toLowerCase() || '').includes(pesquisaCheckInManual.toLowerCase()) ||
+      (convidado.Telefone?.toLowerCase() || '').includes(pesquisaCheckInManual.toLowerCase())
+    )
+    setFilteredGuests(filtered)
+  }
 
   const startCamera = async () => {
     try {
@@ -449,7 +530,10 @@ export default function PaginaCheckIn() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-center">{totalConvidadosPendentes}</div>
+            <div className="text-4xl font-bold text-center mb-4">{allConvidadosPendentes.length}</div>
+            <ScrollArea className="h-40">
+              {renderGuestTypeCounts('pendentes')}
+            </ScrollArea>
           </CardContent>
         </Card>
         <Card>
@@ -460,7 +544,10 @@ export default function PaginaCheckIn() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-center">{totalConvidadosRegistrados}</div>
+            <div className="text-4xl font-bold text-center mb-4">{allConvidadosRegistrados.length}</div>
+            <ScrollArea className="h-40">
+              {renderGuestTypeCounts('registrados')}
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
@@ -660,9 +747,12 @@ export default function PaginaCheckIn() {
                 className="col-span-3 h-12 text-lg w-50"
               />
             </div>
+            <Button onClick={searchGuests}>
+              Buscar Convidados
+            </Button>
           </div>
           <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-            {convidadosFiltrados.map((convidado) => (
+            {filteredGuests.map((convidado) => (
               <div key={convidado.id} className="flex items-center justify-between py-2">
                 <span>{convidado.Nome}</span>
                 <Button
